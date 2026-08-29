@@ -1,61 +1,40 @@
-# Base image with PHP 8.2 and Apache
+# Use official PHP Apache image
 FROM php:8.2-apache
 
-# Install system dependencies required for Laravel and Mikrotik Extensions
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    zip \
-    unzip \
-    libzip-dev \
-    libpq-dev
+# System deps
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    git curl libpng-dev libjpeg-dev libfreetype6-dev libonig-dev libxml2-dev zip unzip libzip-dev libpq-dev \
+  && rm -rf /var/lib/apt/lists/*
 
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install PHP extensions
-RUN docker-php-ext-install pdo_mysql pdo_pgsql mbstring exif pcntl bcmath gd zip sockets
-
-# Enable Apache mod_rewrite
+# Enable apache rewrite
 RUN a2enmod rewrite
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Configure gd and other extensions
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+  && docker-php-ext-install -j$(nproc) gd mbstring exif pcntl bcmath zip sockets pdo pdo_mysql pdo_pgsql
 
-# Set working directory
+# Install composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Set working dir
 WORKDIR /var/www/html
 
-# Copy application files
-COPY . /var/www/html
+# Copy composer files first to leverage Docker cache
+COPY composer.json composer.lock ./
 
-# Configure Apache DocumentRoot to point to Laravel's public directory
-ENV APACHE_DOCUMENT_ROOT /var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/conf-available/*.conf
+# Install PHP deps
+RUN composer install --no-dev --prefer-dist --no-interaction --no-scripts --optimize-autoloader
 
-
-RUN apt-get update && apt-get install -y \
-    libpng-dev libjpeg-dev libfreetype6-dev zip unzip git \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd pdo pdo_mysql
-
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-WORKDIR /var/www
+# Copy app
 COPY . .
-RUN composer install --no-dev --optimize-autoloader
 
-# Set permissions for Laravel
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# Run composer scripts (if you need migrations/optimize)
+RUN composer dump-autoload --optimize
 
-# Install composer dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
+  && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Expose HTTP port
 EXPOSE 80
-
-# Start Apache
 CMD ["apache2-foreground"]

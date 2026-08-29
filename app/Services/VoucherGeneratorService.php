@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Voucher;
 use RouterOS\Client;
 use RouterOS\Query;
+use Illuminate\Support\Facades\DB;
 
 class VoucherGeneratorService
 {
@@ -22,31 +23,35 @@ class VoucherGeneratorService
         }
 
         $profileName = $this->profileMapping[$middleChar];
-        $createdVouchers = [];
 
-        for ($i = 0; $i < $count; $i++) {
-            $code = $this->generateCode(7, $middleChar);
+        return DB::transaction(function () use ($client, $middleChar, $count, $profileName) {
+            $createdVouchers = [];
 
-            $query = (new Query('/user-manager/user/add'))
-                ->equal('name', $code)
-                ->equal('passphrase', $code)
-                ->equal('group', $profileName)
-                ->equal('comment', 'Generated via App');
+            for ($i = 0; $i < $count; $i++) {
+                $code = $this->generateCode(7, $middleChar);
 
-            $client->query($query)->read();
+                $query = (new Query('/user-manager/user/add'))
+                    ->equal('name', $code)
+                    ->equal('passphrase', $code)
+                    ->equal('group', $profileName)
+                    ->equal('comment', 'Generated via App');
 
-            $voucher = Voucher::create([
-                'code'        => $code,
-                'password'    => $code,
-                'profile'     => $profileName,
-                'middle_char' => $middleChar,
-                'status'      => 'active',
-            ]);
+                // This may throw an exception if RouterOS call fails
+                $client->query($query)->read();
 
-            $createdVouchers[] = $voucher;
-        }
+                $voucher = Voucher::create([
+                    'code'        => $code,
+                    'password'    => $code,
+                    'profile'     => $profileName,
+                    'middle_char' => $middleChar,
+                    'status'      => 'active',
+                ]);
 
-        return $createdVouchers;
+                $createdVouchers[] = $voucher;
+            }
+
+            return $createdVouchers;
+        });
     }
 
     private function generateCode(int $length, string $middleChar): string

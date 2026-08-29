@@ -23,12 +23,22 @@ class VoucherController extends Controller
             'count'       => 'required|integer|min:1|max:500',
         ]);
 
+        // Validate Mikrotik config
+        $host = config('mikrotik.host');
+        $user = config('mikrotik.user');
+        $pass = config('mikrotik.pass');
+        $port = config('mikrotik.port');
+
+        if (empty($host) || empty($user) || $pass === null) {
+            return redirect()->back()->with('error', 'إعدادات Mikrotik غير مكتملة. تحقق من config/mikrotik.php وملف .env.');
+        }
+
         try {
             $client = new Client([
-                'host' => config('mikrotik.host'),
-                'user' => config('mikrotik.user'),
-                'pass' => config('mikrotik.pass'),
-                'port' => config('mikrotik.port'),
+                'host' => $host,
+                'user' => $user,
+                'pass' => $pass,
+                'port' => $port,
             ]);
 
             $newVouchers = $generatorService->generateAndSave(
@@ -36,6 +46,9 @@ class VoucherController extends Controller
                 $request->input('middle_char'),
                 $request->input('count')
             );
+
+            // Store generated vouchers in session so exportPdf can use them
+            session()->put('vouchers', $newVouchers);
 
             return redirect()->back()->with([
                 'success'  => "تم إنشاؤها وحفظها بنجاح.",

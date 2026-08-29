@@ -1,8 +1,8 @@
 <?php
 
 return [
-    'host' => env('MIKROTIK_HOST', "9bd80a71f545.sn.mynetname.net"),
-    'user' => env('MIKROTIK_USER', 'mator'),
-    'pass' => env('MIKROTIK_PASS', 'mator122055'),
+    'host' => env('MIKROTIK_HOST', '127.0.0.1'),
+    'user' => env('MIKROTIK_USER', 'admin'),
+    'pass' => env('MIKROTIK_PASS', ''),
     'port' => env('MIKROTIK_PORT', 8728),
 ];
