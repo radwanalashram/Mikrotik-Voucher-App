@@ -20,17 +20,20 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Set working dir
 WORKDIR /var/www/html
 
-# Copy composer files first to leverage Docker cache
-COPY composer.json composer.lock ./
-
-# Install PHP deps
-RUN composer install --no-dev --prefer-dist --no-interaction --no-scripts --optimize-autoloader
-
-# Copy app
+# Copy app (copy full project so build doesn't fail when composer.json is absent)
 COPY . .
 
-# Run composer scripts (if you need migrations/optimize)
-RUN composer dump-autoload --optimize
+# Install PHP deps if composer.json exists
+RUN if [ -f composer.json ]; then \
+      composer install --no-dev --prefer-dist --no-interaction --no-scripts --optimize-autoloader; \
+    else \
+      echo "composer.json not found, skipping composer install"; \
+    fi
+
+# Run composer dump-autoload if composer.json exists
+RUN if [ -f composer.json ]; then \
+      composer dump-autoload --optimize; \
+    fi
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
