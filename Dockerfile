@@ -23,16 +23,16 @@ WORKDIR /var/www/html
 # Copy app (copy full project so build doesn't fail when composer.json is absent)
 COPY . .
 
-# Install PHP deps if composer.json exists
+# Install PHP deps if composer.json exists (increase memory limit to avoid OOM)
 RUN if [ -f composer.json ]; then \
-      composer install --no-dev --prefer-dist --no-interaction --no-scripts --optimize-autoloader; \
+      COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --prefer-dist --no-interaction --no-scripts --optimize-autoloader; \
     else \
       echo "composer.json not found, skipping composer install"; \
     fi
 
 # Run composer dump-autoload if composer.json exists
 RUN if [ -f composer.json ]; then \
-      composer dump-autoload --optimize; \
+      COMPOSER_MEMORY_LIMIT=-1 composer dump-autoload --optimize; \
     fi
 
 # Set permissions
